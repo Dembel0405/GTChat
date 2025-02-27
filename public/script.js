@@ -93,41 +93,44 @@ function loadChatHistory() {
 
 // Обработка и отображение ответа
 function processReply(data) {
-    let replyText = data.reply;
-    const codeBlockRegex = /```(.*?)\n([\s\S]*?)```/g;
-    let processedMessage = '';
+    let replyText = data.reply || ''; // Проверяем, есть ли ответ
+    console.log("Ответ от сервера:", replyText);
 
-    let codeMatch;
-    while ((codeMatch = codeBlockRegex.exec(replyText)) !== null) {
-        const language = codeMatch[1] || 'plaintext';
-        const codeContent = escapeHTML(codeMatch[2]);
+    // Обрабатываем код-блоки
+    replyText = replyText.replace(/```(\w*)\n([\s\S]*?)```/g, (match, lang, code) => {
+        lang = lang || 'plaintext';
+        return `<pre><code class="language-${lang}">${escapeHTML(code)}</code></pre>`;
+    });
 
-        // Добавляем код с кнопкой копирования
-        processedMessage += `
-            <div class="code-container">
-                <button class="copy-btn">Копировать</button>
-                <pre><code class="language-${language}">${codeContent}</code></pre>
-            </div>
-        `;
-    }
+    // Обрабатываем списки
+    replyText = replyText.replace(/(?:^|\n)\*\s+(.*?)(?=\n|$)/g, '<li>$1</li>');
+    replyText = replyText.replace(/(<li>.*?<\/li>)+/g, '<ul>$&</ul>');
 
-    // Удаляем код из основного текста
-    replyText = replyText.replace(codeBlockRegex, '');
+    // Обрабатываем жирный текст и курсив
+    replyText = replyText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    replyText = replyText.replace(/\*(.*?)\*/g, '<em>$1</em>');
 
-    // Проверяем наличие кода перед добавлением контейнера
-    const codeBlockHtml = processedMessage
-        ? `<div class="code-block">${processedMessage}</div>`
-        : '';
+    // Обрабатываем переносы строк
+    replyText = replyText.replace(/\n/g, '<br/>');
 
-    return `
+    console.log("После форматирования:", replyText);
+
+    const replyHtml = `
         <div class="message ai">
             <img src="./img/blue.png" alt="AI Avatar" class="avatar">
             <div class="reply-text">${replyText}</div>
-            ${codeBlockHtml}
         </div>`;
+
+    // Подсветка синтаксиса
+    setTimeout(() => {
+        document.querySelectorAll('pre code').forEach((block) => {
+            hljs.highlightElement(block);
+        });
+    }, 100);
+
+    return replyHtml;
 }
 
-hljs.highlightAll();
 
 userInput.addEventListener('keydown', async (event) => {
     if (event.key === 'Enter') {

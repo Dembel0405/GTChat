@@ -1,95 +1,183 @@
 const express = require('express');
-const axios = require('axios');
+const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require('@google/generative-ai');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const winston = require('winston');
+const cors = require('cors');
+const compression = require('compression');
 require('dotenv').config();
-const path = require('path');
+
+// Настройка логгера
+const logger = winston.createLogger({
+    level: 'info',
+    format: winston.format.combine(
+        winston.format.timestamp(),
+        winston.format.json()
+    ),
+    transports: [
+        new winston.transports.File({ filename: 'error.log', level: 'error' }),
+        new winston.transports.File({ filename: 'combined.log' }),
+        new winston.transports.Console({
+            format: winston.format.simple()
+        })
+    ]
+});
 
 const app = express();
+const port = 3000;
 
-app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+// Проверка API ключа
+if (!process.env.GEMINI_API_KEY) {
+    logger.error('GEMINI_API_KEY не найден в .env файле');
+    process.exit(1);
+}
 
-// Вводные данные о колледже
-const collegeInfo = {
-    name: "Актюбинский высший политехнический колледж",
-    established: 1965,
-    description: "Актюбинский высший политехнический колледж был основан в 1965 году."
+// Настройка Rate Limiting
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 100
+});
+
+// Настройка CORS
+const corsOptions = {
+    origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : '*',
+    methods: ['GET', 'POST'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    maxAge: 86400
 };
 
-// Добавьте обработчик для корневого маршрута
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+// Middleware
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'", 'cdnjs.cloudflare.com'],
+            styleSrc: ["'self'", "'unsafe-inline'", 'cdnjs.cloudflare.com'],
+            imgSrc: ["'self'", 'data:', 'blob:'],
+        },
+    }
+}));
+app.use(cors(corsOptions));
+app.use(compression());
+app.use(limiter);
+app.use(express.json());
+app.use(express.static('public'));
 
+// Инициализация Gemini AI
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+// Тестовый запрос к API
+async function testGeminiAPI() {
+    try {
+        logger.info('Начало тестирования Gemini API...');
+        logger.info('API KEY присутствует:', !!process.env.GEMINI_API_KEY);
+        
+        // Создаем модель
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        logger.info('Модель создана:', model.model);
+        
+        // Тестовый запрос
+        logger.info('Отправляем тестовый запрос к API...');
+        const result = await model.generateContent('Say "Hello" in Russian', {
+            temperature: 0.9,
+            topK: 1,
+            topP: 1,
+            maxOutputTokens: 2048,
+        });
+        logger.info('Получен ответ от API (result):', !!result);
+        
+        const response = await result.response;
+        logger.info('Получен response:', !!response);
+        
+        const text = response.text();
+        logger.info('Получен текст ответа:', text);
+        
+        return true;
+    } catch (error) {
+        logger.error('Ошибка в testGeminiAPI:', {
+            name: error.name,
+            message: error.message,
+            stack: error.stack,
+            details: error.toString()
+        });
+        return false;
+    }
+}
+
+// Обработчик сообщений
 app.post('/chat', async (req, res) => {
-    const userMessage = req.body.message;
-    if (!userMessage) {
-        return res.status(400).json({ error: 'Message is required' });
-    }
-
-    const context = `Вы ассистент колледжа. ${collegeInfo.description}`;
-    if (!process.env.GEMINI_API_KEY) {
-        return res.status(500).json({ error: 'API key is missing' });
-    }
-
-    let responseSent = false;
-
-    const sendRequest = async (retries = 3) => {
-        try {
-            const response = await axios.post(
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${process.env.GEMINI_API_KEY}`,
-                {
-                    contents: [
-                        {
-                            parts: [
-                                { text: `${context}\n\nВопрос: ${userMessage}` }
-                            ]
-                        }
-                    ]
-                },
-                { headers: { 'Content-Type': 'application/json' } }
-            );
-
-            console.log('API Response:', response.data);
-
-            if (!responseSent) {
-                if (response.data.candidates && response.data.candidates.length > 0) {
-                    const candidate = response.data.candidates[0];
-                    console.log('Candidate content:', candidate.content); // Логируем content
-
-                    if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
-                        const responseText = candidate.content.parts.map(part => part.text).join('');
-                        res.json({ reply: responseText });
-                    } else {
-                        console.log('No parts in candidate content');
-                        res.json({ reply: 'Ответ не найден.' });
-                    }
-                } else {
-                    console.log('No candidates received');
-                    res.json({ reply: 'No candidates received.' });
-                }
-                responseSent = true;
-            }
-        } catch (error) {
-            console.error('Fetch error:', error.response ? error.response.data : error.message);
-            if (error.response && error.response.status === 503 && retries > 0) {
-                console.log('Повторный запрос...');
-                return setTimeout(() => sendRequest(retries - 1), 5000);
-            }
-            if (!responseSent) {
-                res.status(500).json({ error: 'Internal Server Error' });
-                responseSent = true;
-            }
+    try {
+        const { message } = req.body;
+        if (!message) {
+            return res.status(400).json({ error: 'Message is required' });
         }
-    };
 
-    sendRequest();
+        logger.info('Получено сообщение:', message);
+        logger.info('API KEY присутствует:', !!process.env.GEMINI_API_KEY);
+
+        try {
+            // Создаем модель
+            const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+            logger.info('Модель создана:', model.model);
+            
+            // Отправляем сообщение
+            logger.info('Отправляем запрос к API...');
+            const result = await model.generateContent(message, {
+                temperature: 0.9,
+                topK: 1,
+                topP: 1,
+                maxOutputTokens: 2048,
+            });
+            logger.info('Получен ответ от API (result):', !!result);
+            
+            const response = await result.response;
+            logger.info('Получен response:', !!response);
+            
+            const text = response.text();
+            logger.info('Получен текст ответа:', text);
+            
+            logger.info('Успешно получен ответ от Gemini');
+            return res.json({ response: text });
+        } catch (error) {
+            logger.error('Ошибка при генерации ответа:', {
+                name: error.name,
+                message: error.message,
+                stack: error.stack,
+                details: error.toString()
+            });
+            return res.status(500).json({ 
+                error: 'Ошибка при получении ответа от AI',
+                details: process.env.NODE_ENV === 'development' ? error.message : undefined
+            });
+        }
+    } catch (error) {
+        logger.error('Общая ошибка в обработчике /chat:', {
+            name: error.name,
+            message: error.message,
+            stack: error.stack,
+            details: error.toString()
+        });
+        return res.status(500).json({ 
+            error: 'Внутренняя ошибка сервера',
+            details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
 });
 
+// Запуск сервера
+const server = app.listen(port, async () => {
+    logger.info(`Сервер запущен на порту ${port}`);
+    const apiTest = await testGeminiAPI();
+    if (!apiTest) {
+        logger.error('Ошибка подключения к Gemini API');
+    }
+});
 
-
-
-// Указываем порт, на котором будет запущен сервер
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT}`);
+// Graceful shutdown
+process.on('SIGTERM', () => {
+    logger.info('SIGTERM signal received. Closing HTTP server...');
+    server.close(() => {
+        logger.info('HTTP server closed');
+        process.exit(0);
+    });
 });

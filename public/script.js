@@ -93,7 +93,7 @@ function loadChatHistory() {
 
 // Обработка и отображение ответа
 function processReply(data) {
-    let replyText = data.reply || ''; // Проверяем, есть ли ответ
+    let replyText = data.response || ''; // Изменено с data.reply на data.response
     console.log("Ответ от сервера:", replyText);
 
     // Обрабатываем код-блоки
@@ -153,14 +153,19 @@ userInput.addEventListener('keydown', async (event) => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message })
             });
-
+            console.log('Статус ответа:', response.status);
+            
             const data = await response.json();
+            console.log('Данные от сервера:', data);
+            
             const replyMessage = processReply(data);
+            console.log('Обработанное сообщение:', replyMessage);
 
             chat.innerHTML += replyMessage;
             saveMessage(replyMessage);
         } catch (error) {
-            const errorMessage = `<div class="message ai"><span>Ошибка при отправке сообщения.</span></div>`;
+            console.error('Ошибка:', error);
+            const errorMessage = `<div class="message ai"><span>Ошибка при отправке сообщения: ${error.message}</span></div>`;
             chat.innerHTML += errorMessage;
             saveMessage(errorMessage);
         } finally {
@@ -188,14 +193,19 @@ sendButton.addEventListener('click', async () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ message })
         });
-
+        console.log('Статус ответа:', response.status);
+        
         const data = await response.json();
+        console.log('Данные от сервера:', data);
+        
         const replyMessage = processReply(data);
+        console.log('Обработанное сообщение:', replyMessage);
 
         chat.innerHTML += replyMessage;
         saveMessage(replyMessage);
     } catch (error) {
-        const errorMessage = `<div class="message ai"><span>Ошибка при отправке сообщения.</span></div>`;
+        console.error('Ошибка:', error);
+        const errorMessage = `<div class="message ai"><span>Ошибка при отправке сообщения: ${error.message}</span></div>`;
         chat.innerHTML += errorMessage;
         saveMessage(errorMessage);
     } finally {

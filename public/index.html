@@ -1,84 +1,61 @@
 <!DOCTYPE html>
 <html lang="ru">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="./style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.5.1/styles/monokai-sublime.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/default.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.5.1/highlight.min.js"></script>
+    <meta name="description" content="AHPC Chat - AI-powered chatbot for Aktobe Higher Polytechnic College">
+    <meta name="keywords" content="AHPC, chat, AI, college, education, Aktobe">
+    <meta name="author" content="Aktobe Higher Polytechnic College">
+    <meta name="robots" content="index, follow">
     
-    <title>AHPC Chat</title>
-
+    <title>AHPC Chat - Актюбинский высший политехнический колледж</title>
+    
+    <link rel="icon" type="image/x-icon" href="./favicon.ico">
+    <link rel="stylesheet" href="./style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/monokai-sublime.min.css">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js" defer></script>
 </head>
 
 <body>
-<div class="head">
-  <h1>GT</h1> 
-  <h2>AI</h2>
-</div>
+    <header class="head">
+        <h1>GT</h1> 
+        <h2>AI</h2>
+    </header>
     
-    <div id="chat"></div>
-<div class="messageBox">
-  <!-- <div class="fileUploadWrapper">
-    <label for="file">
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 337 337">
-        <circle
-          stroke-width="20"
-          stroke="#6c6c6c"
-          fill="none"
-          r="158.5"
-          cy="168.5"
-          cx="168.5"
-        ></circle>
-        <path
-          stroke-linecap="round"
-          stroke-width="25"
-          stroke="#6c6c6c"
-          d="M167.759 79V259"
-        ></path>
-        <path
-          stroke-linecap="round"
-          stroke-width="25"
-          stroke="#6c6c6c"
-          d="M79 167.138H259"
-        ></path>
-      </svg>
-      <span class="tooltip">Add an image</span>
-    </label>
-    <input type="file" id="file" name="file" />
-  </div> -->
-  <input required="" placeholder="Message..." type="text" id="userInput" />
-  <button id="sendButton">
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 664 663">
-      <path
-        fill="none"
-        d="M646.293 331.888L17.7538 17.6187L155.245 331.888M646.293 331.888L17.753 646.157L155.245 331.888M646.293 331.888L318.735 330.228L155.245 331.888"
-      ></path>
-      <path
-        stroke-linejoin="round"
-        stroke-linecap="round"
-        stroke-width="33.67"
-        stroke="#ffffff"
-        d="M646.293 331.888L17.7538 17.6187L155.245 331.888M646.293 331.888L17.753 646.157L155.245 331.888M646.293 331.888L318.735 330.228L155.245 331.888"
-      ></path>
-    </svg>
-  </button>
-</div>
-    <div class="button-container">
-        <button id="clearChatButton">Очистить чат</button>
-    </div>
+    <main>
+        <div id="chat" role="log" aria-live="polite"></div>
+        
+        <div class="messageBox">
+            <div class="fileUploadWrapper">
+                <label for="file" aria-label="Загрузить изображение">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 337 337" aria-hidden="true">
+                        <circle stroke-width="20" stroke="#6c6c6c" fill="none" r="158.5" cy="168.5" cx="168.5"></circle>
+                        <path stroke-linecap="round" stroke-width="25" stroke="#6c6c6c" d="M167.759 79V259"></path>
+                        <path stroke-linecap="round" stroke-width="25" stroke="#6c6c6c" d="M79 167.138H259"></path>
+                    </svg>
+                    <span class="tooltip">Добавить изображение</span>
+                </label>
+                <input type="file" id="file" name="file" accept="image/*" aria-label="Загрузить изображение" />
+            </div>
+            
+            <input required placeholder="Введите сообщение..." type="text" id="userInput" aria-label="Введите сообщение" />
+            
+            <button id="sendButton" aria-label="Отправить сообщение">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 664 663" aria-hidden="true">
+                    <path fill="none" d="M646.293 331.888L17.7538 17.6187L155.245 331.888M646.293 331.888L17.753 646.157L155.245 331.888M646.293 331.888L318.735 330.228L155.245 331.888"></path>
+                    <path stroke-linejoin="round" stroke-linecap="round" stroke-width="33.67" stroke="#ffffff" d="M646.293 331.888L17.7538 17.6187L155.245 331.888M646.293 331.888L17.753 646.157L155.245 331.888M646.293 331.888L318.735 330.228L155.245 331.888"></path>
+                </svg>
+            </button>
+        </div>
+        
+        <div class="button-container">
+            <button id="clearChatButton" aria-label="Очистить историю чата">Очистить чат</button>
+        </div>
+        
+        <div id="typing-indicator" class="typing-indicator" aria-live="polite">ИИ набирает сообщение...</div>
+    </main>
 
-    
-
-    <div id="typing-indicator" class="typing-indicator">ИИ набирает сообщение...</div>
-<script src="./script.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+    <script src="./script.js" defer></script>
 </body>
-
-
-
-
 </html>
-

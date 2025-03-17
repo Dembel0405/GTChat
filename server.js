@@ -107,62 +107,74 @@ async function testGeminiAPI() {
 // Обработчик сообщений
 app.post('/chat', async (req, res) => {
     try {
-        const { message } = req.body;
-        if (!message) {
-            return res.status(400).json({ error: 'Message is required' });
+        const { messages } = req.body;
+        if (!messages || !Array.isArray(messages) || messages.length === 0) {
+            return res.status(400).json({ error: 'Messages array is required' });
         }
 
-        logger.info('Получено сообщение:', message);
-        logger.info('API KEY присутствует:', !!process.env.GEMINI_API_KEY);
+        logger.info('Received message history:', messages);
+        logger.info('API KEY present:', !!process.env.GEMINI_API_KEY);
+
+        // Transforming messages to the required format
+        const formattedMessages = messages.map(msg => ({
+            role: msg.role,
+            parts: [{ text: msg.content }]
+        }));
 
         try {
-            // Создаем модель
+            // Create the model
             const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-            logger.info('Модель создана:', model.model);
-            
-            // Отправляем сообщение
-            logger.info('Отправляем запрос к API...');
-            const result = await model.generateContent(message, {
-                temperature: 0.9,
-                topK: 1,
-                topP: 1,
-                maxOutputTokens: 2048,
+            logger.info('Model created:', model.model);
+
+            // Send the message history to the API
+            logger.info('Sending request to API with message history...');
+            const result = await model.generateContent({
+                contents: formattedMessages, // Passing the formatted message history
+                generationConfig: {
+                    temperature: 0.9,
+                    topK: 1,
+                    topP: 1,
+                    maxOutputTokens: 2048,
+                }
             });
-            logger.info('Получен ответ от API (result):', !!result);
-            
+
+            logger.info('Received result from API:', !!result);
             const response = await result.response;
-            logger.info('Получен response:', !!response);
+            logger.info('Received response:', !!response);
             
             const text = response.text();
-            logger.info('Получен текст ответа:', text);
+            logger.info('Received response text:', text);
             
-            logger.info('Успешно получен ответ от Gemini');
+            logger.info('Successfully received response from Gemini');
             return res.json({ response: text });
+
         } catch (error) {
-            logger.error('Ошибка при генерации ответа:', {
+            logger.error('Error generating response:', {
                 name: error.name,
                 message: error.message,
                 stack: error.stack,
                 details: error.toString()
             });
             return res.status(500).json({ 
-                error: 'Ошибка при получении ответа от AI',
+                error: 'Error obtaining response from AI',
                 details: process.env.NODE_ENV === 'development' ? error.message : undefined
             });
         }
     } catch (error) {
-        logger.error('Общая ошибка в обработчике /chat:', {
+        logger.error('General error in /chat handler:', {
             name: error.name,
             message: error.message,
             stack: error.stack,
             details: error.toString()
         });
         return res.status(500).json({ 
-            error: 'Внутренняя ошибка сервера',
+            error: 'Internal server error',
             details: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
     }
 });
+
+
 
 // Запуск сервера
 const server = app.listen(port, async () => {

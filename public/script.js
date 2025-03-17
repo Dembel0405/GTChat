@@ -55,28 +55,33 @@ function addMessage(content, isUser) {
     const message = document.createElement('div');
     message.className = isUser ? 'message user' : 'message ai';
 
-    // Создание элемента для аватарки
     if (!isUser) {
         const avatar = document.createElement('img');
-        avatar.src = 'path/to/logo.png'; // Замените на путь к логотипу компании
+        avatar.src = './img/blue.png';
         avatar.alt = 'AI Avatar';
         avatar.className = 'avatar';
-        message.appendChild(avatar); // Добавляем аватар в сообщение
+        message.appendChild(avatar);
     }
 
-    // Убедитесь, что контент предварительно обработан функцией formatReply
     const formattedContent = formatReply(content);
     const textContainer = document.createElement('div');
     textContainer.innerHTML = formattedContent;
     message.appendChild(textContainer);
 
-    chat.appendChild(message); // Добавляем сообщение в контейнер
-    chat.scrollTop = chat.scrollHeight; // Прокручиваем чат вниз
+    chat.appendChild(message);
+    chat.scrollTop = chat.scrollHeight;
 }
 
 // Сохранение сообщения
-function saveMessage(message) {
+function loadChatHistory() {
     const chatHistory = JSON.parse(localStorage.getItem('chatHistory')) || [];
+    chat.innerHTML = '';
+    chatHistory.forEach(({ role, content }) => addMessage(content, role === "user"));
+}
+
+function saveMessages(message) {
+    // Logic to save the message, e.g., to local storage or a database
+    const chatHistory = getChatHistory();
     chatHistory.push(message);
     localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
 }
@@ -131,49 +136,51 @@ function processReply(data) {
     return replyHtml;
 }
 
+// Функция получения истории сообщений
+function getChatHistory() {
+    return JSON.parse(localStorage.getItem('chatHistory')) || [];
+}
 
 userInput.addEventListener('keydown', async (event) => {
     if (event.key === 'Enter') {
-        event.preventDefault(); // предотвращает стандартное поведение Enter (перенос строки)
-        
+        event.preventDefault();
         const message = userInput.value.trim();
-        if (!message) return; // если сообщение пустое, не отправляем
+        if (!message) return;
 
-        // Отображение сообщения пользователя
-        const userMessage = `<div class="message user"> ${escapeHTML(message)}</div>`;
-        chat.innerHTML += userMessage;
-        saveMessage(userMessage);
+        addMessage(message, true);
+        let chatHistory = getChatHistory();
+
+        chatHistory.push({ role: "user", content: message });
         userInput.value = '';
-
         document.getElementById('typing-indicator').classList.add('active');
 
         try {
             const response = await fetch('/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message })
+                body: JSON.stringify({ messages: chatHistory })
             });
-            console.log('Статус ответа:', response.status);
-            
-            const data = await response.json();
-            console.log('Данные от сервера:', data);
-            
-            const replyMessage = processReply(data);
-            console.log('Обработанное сообщение:', replyMessage);
 
-            chat.innerHTML += replyMessage;
-            saveMessage(replyMessage);
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            const replyMessage = data.response || "Ошибка ответа";
+            chatHistory.push({ role: "model", content: replyMessage });
+            localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+
+            addMessage(replyMessage, false);
         } catch (error) {
-            console.error('Ошибка:', error);
-            const errorMessage = `<div class="message ai"><span>Ошибка при отправке сообщения: ${error.message}</span></div>`;
-            chat.innerHTML += errorMessage;
-            saveMessage(errorMessage);
+            console.error('Ошибка при отправке запроса:', error);
+            addMessage(`Ошибка при отправке сообщения: ${error.message}`, false);
         } finally {
             document.getElementById('typing-indicator').classList.remove('active');
             scrollToBottom();
         }
     }
 });
+
 
 // Отправка сообщения
 sendButton.addEventListener('click', async () => {
@@ -182,18 +189,26 @@ sendButton.addEventListener('click', async () => {
 
     const userMessage = `<div class="message user">Вы: ${escapeHTML(message)}</div>`;
     chat.innerHTML += userMessage;
-    saveMessage(userMessage);
+    saveMessages(userMessage);
     userInput.value = '';
 
     document.getElementById('typing-indicator').classList.add('active');
 
     try {
+        const chatHistory = getChatHistory();
+        const messages = chatHistory.map(message => ({
+            role: message.role, // "user" или "model"
+            parts: [{ text: message.content }] // API ожидает "parts"
+        }));
+        
         const response = await fetch('/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message })
+            body: JSON.stringify({ messages })
         });
+        
         console.log('Статус ответа:', response.status);
+        
         
         const data = await response.json();
         console.log('Данные от сервера:', data);
@@ -202,12 +217,12 @@ sendButton.addEventListener('click', async () => {
         console.log('Обработанное сообщение:', replyMessage);
 
         chat.innerHTML += replyMessage;
-        saveMessage(replyMessage);
+        saveMessages(replyMessage);
     } catch (error) {
         console.error('Ошибка:', error);
         const errorMessage = `<div class="message ai"><span>Ошибка при отправке сообщения: ${error.message}</span></div>`;
         chat.innerHTML += errorMessage;
-        saveMessage(errorMessage);
+        saveMessages(errorMessage);
     } finally {
         document.getElementById('typing-indicator').classList.remove('active');
         scrollToBottom();

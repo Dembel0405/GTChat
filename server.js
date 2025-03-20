@@ -178,7 +178,7 @@ app.post('/chat', async (req, res) => {
 
 // Запуск сервера
 const server = app.listen(port, async () => {
-    logger.info(`Сервер запущен на порту ${port}`);
+    logger.info(`Сервер запущен на порту http://localhost:${port}`);
     const apiTest = await testGeminiAPI();
     if (!apiTest) {
         logger.error('Ошибка подключения к Gemini API');
